@@ -1,83 +1,113 @@
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const config = require("./botconfig.json");
+const Poll = require("./poll.js");
 
-const emojis = ["0⃣", "1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"];
+const numEmojis = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"];
+const handEmojis = ["👍", "👎"];
+
+// let commandSyntaxRegex = new RegExp(config.prefix + "\\s(((-t=\\d+[smhd\\s]\s)?(\"[^\"]*\"\\s?)+)|(help)|(invite))");
+let commandSyntaxRegex = new RegExp(config.prefix + "\\s(((-t=\\d+[smhd\\s]\s)?(\"[^\"]*\"\\s?)+)|(help)|(examples))");
+
+let pollMap = new Map();
 
 client.on('ready', () => {
 	console.log(`Bot logged in as ${client.user.tag}!`);
 	client.user.setActivity(`${config.prefix} help`);
+	// setInterval(()=>console.log(pollMap),6000);
 });
 
 client.on('message', async msg => {
 	if (msg.content.startsWith(config.prefix) && !msg.author.bot) {
-		if (msg.content === config.prefix + " help") help(msg);
-		// else if(msg.content === config.prefix + " invite") invite(msg);
-		else poll(msg);
+		poll(msg);
 	}
 });
 
 client.login(config.token);
 
 async function poll(msg) {
-	console.log("Poll executed in " + msg.guild.name + " by " + msg.author.tag);
+	
+	if (!msg.content.match(commandSyntaxRegex)) {
+		msg.reply(`Wrong command syntax. Learn how to do it correctly with \`${config.prefix} help\``);
+		return;
+	}
 
-	let args = await parseToArgs(msg);
+	let args = parseToArgs(msg);
 	let time = 0;
 
-	if(args.length == 0) {
-		msg.reply("Sorry, I cannot create an empty poll");
+	if (args.length == 0) {
+		msg.reply(`Sorry, give me more at least a question`);
 		return;
 	}
 
 	//parse the time limit if it exists
-	if(args[0].startsWith("-t=")) {
+	if (args[0].startsWith("-t=")) {
 		const timeRegex = /\d+/;
 		const unitRegex = /s|m|h|d/i;
 		let _time = args.shift();
 		let unit = 's';
 
 		let match1 = _time.match(timeRegex);
-		if(match1 != null) time = parseInt(match1.shift());
-		else{
+		if (match1 != null) time = parseInt(match1.shift());
+		else {
 			msg.reply("Wrong time syntax!");
 			return;
 		}
 
 		let match2 = _time.match(unitRegex);
-		if(match2 != null) unit = match2.shift();
+		if (match2 != null) unit = match2.shift();
 
-		switch(unit) {
+		switch (unit) {
 			case 's': time *= 1000;
-			break;
+				break;
 			case 'm': time *= 60000;
-			break;
+				break;
 			case 'h': time *= 3600000;
-			break;
+				break;
 			case 'd': time *= 86400000;
-			break;
+				break;
 			default: time *= 1000;
 		}
-	}
+	} else if (args[0] == "help") {
+		console.log("Help executed in " + msg.guild.name + " by " + msg.author.tag);
+		help(msg);
+		return;
+	}else if(args[0] == "examples") {
+		console.log("Examples executed in " + msg.guild.name + " by " + msg.author.tag);
+		examples(msg);
+		return;
+	}/*else if(args[0] == "invite") {
+		console.log("Invite executed in " + msg.guild.name + " by " + msg.author.tag);
+		msg.reply("This is the link to invite me to another server! " + config.link);
+		return;
+	}*/
 
-	console.log(args + " - Time: " + time);
+	console.log("Poll executed in " + msg.guild.name + " by " + msg.author.tag);
+
+	// console.log(args + " - Time: " + time);
 
 	let question = args.shift();
+	let answers = new Array();
+	let emojis = numEmojis;
 
-	let pollmsgEmbed = await generatePollMsg(question, args);
+	switch (args.length) {
+		case 0:
+			answers = ["", ""];
+			emojis = handEmojis;
+			break;
+		case 1:
+			msg.reply("You cannot create a poll with only one question");
+			return;
+		default:
+			answers = args;
+			break;
+	}
 
-	await msg.channel.send({ embed: pollmsgEmbed })
-		.then(async message => {
-			if(time > 0) voting(message, time);
-			for (let i = 0; i < args.length && i < 10; i++) {
-				try {
-					await message.react(emojis[i + 1]);
-				} catch (error) {
-					console.log(error);
-				}
-			}
-			return message;
-		}).catch(console.error);
+	let p = await new Poll(msg.channel, question, answers, time, emojis);
+
+	p.start();
+
+	pollMap.set(p.id, p);
 }
 
 function parseToArgs(msg) {
@@ -89,39 +119,27 @@ function parseToArgs(msg) {
 	return args;
 }
 
-function generatePollMsg(question, answers) {
-	let msg = new String();
-	for (let i = 0; i < answers.length && i < 10; i++) {
-		msg += emojis[i + 1] + ". " + answers[i] + "\n";
-	}
-
-	let embed = new Discord.RichEmbed()
-		.setAuthor(question)
-		.setDescription(msg)
-		.setFooter('React with the emojis below');
-
-	return embed;
-}
-
-async function voting(pollmsg, time) {
-	let filter = (reaction) => emojis.includes(reaction.emoji.name);
-	const reactions = await pollmsg.awaitReactions(filter, {time: time});
-	let results = new Array(reactions.size);
-	for(let i = 0; i < reactions.size; i++) {
-		results[i] = reactions.get(emojis[i+1]).count - 1;
-	}
-	return results;
-}
-
 function help(msg) {
-	console.log("Help executed in " + msg.guild.name + " by " + msg.author.tag);
-
 	const helpEmbed = new Discord.RichEmbed()
 		.setAuthor("VotaBot's Commands")
 		.addField("Create Y/N poll", "`" + config.prefix + " \"{question}\"" + "`")
-		.addField("Create complex poll [2-10]", "`" + config.prefix + " \"{question}\" \"[Option 1]\" \"[Option 2]\"..." + "`")
+		.addField("Create complex poll [2-10 answers]", "`" + config.prefix + " \"{question}\" \"[Option 1]\"" +
+			" \"[Option 2]\"...`")
 		.addField("Timed polls", "Just add `-t=TIME[s|m|h|d]` after the \"" + config.prefix + "\", where \"TIME\" is " +
-			"the time to finish the poll followed by it's unit.");
+			"the time to finish the poll followed by it's unit.")
+		.addField("See examples", "`" + config.prefix + " examples" + "`");
+	//.addField("Invite", "Request a link to invite this bot to another server.");
 
 	msg.channel.send({ embed: helpEmbed });
+}
+
+function examples(msg) {
+	const examplesEmbed = new Discord.RichEmbed()
+		.setAuthor("Examples of VotaBot's commands")
+		.addField("Y/N Poll", "`" + config.prefix + " \"Do you like this?\"`")
+		.addField("Complex poll", "`" + config.prefix + " \"What do you wanna play?\" \"Overwatch\" \"CS:GO\"" +
+			"\"Quake\" \"WoW\"`")
+		.addField("Timed poll", "`" + config.prefix + "-t=6h \"Chat tonight?\"`");
+	
+	msg.channel.send({embed: examplesEmbed});
 }
