@@ -117,8 +117,9 @@ class Poll {
 			if (this.finished) {
 				if (this.results.length >= 2) {
 					let description = new String();
-					let totalVotes = 1;
+					let totalVotes = 0;
 					this.results.forEach(answer => totalVotes += answer);
+					if(totalVotes == 0) totalVotes = 1;
 					for (let i = 0; i < this.results.length; i++) {
 						description += this.emojis[i] + " " + this.answers[i] + " :: **" + this.results[i] + "** :: " +
 							(this.results[i] / totalVotes) * 100 + "% \n";

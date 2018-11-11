@@ -24,7 +24,8 @@ client.on('ready', () => {
 
 client.on('message', async msg => {
 	if (msg.content.startsWith(config.prefix) && !msg.author.bot) {
-		let roleid = msg.guild.roles.find(r => r.name === "Poll Creator").id;
+		let role = await msg.guild.roles.find(r => r.name === "Poll Creator");
+		if(role) roleid = role.id;
 		if (msg.member.hasPermission("ADMINISTRATOR") || msg.member.roles.has(roleid)) {
 			if (msg.content.match(commandSyntaxRegex)) {
 				let args = parseToArgs(msg);
