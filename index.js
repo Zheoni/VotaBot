@@ -50,7 +50,8 @@ client.on('ready', () => {
 
 client.on('message', async msg => {
 	if (msg.content.startsWith(config.prefix) && !msg.author.bot) {
-		let role = -1;
+		let role;
+		let roleid = -1;
 		try {
 			role = await msg.guild.roles.find(r => r.name === "Poll Creator");
 			if(role) roleid = role.id;
