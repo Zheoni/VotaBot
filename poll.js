@@ -89,8 +89,12 @@ class Poll {
 			this.finishedOn = now;
 			this.embed.setColor("FF0800");
 			this.embed.setAuthor(this.question + " [FINISHED]")
-			this.embed.setFooter("Poll " + this.id + " finished " + now.toUTCString());
-			await this.msg.edit({ embed: this.embed });
+			this.embed.setFooter(`Poll ${this.id} finished ${now.toUTCString()}`);
+			try {
+				await this.msg.edit({ embed: this.embed });
+			} catch (error) {
+				console.error(error);
+			}
 			this.getVotes().then(this.showResults()).then(resolve()).catch(console.error);
 		});
 	}
@@ -125,7 +129,7 @@ class Poll {
 							(this.results[i] / totalVotes) * 100 + "% \n";
 					}
 
-					let footer = "Results from poll " + this.id + " finished on " + (this.finishedOn.toUTCString());
+					let footer = `Results from poll ${this.id} finished on ${this.finishedOn.toUTCString()}`;
 					let resultsEmbed = new Discord.RichEmbed()
 						.setAuthor("Results of: " + this.question)
 						.setDescription(description)

@@ -64,34 +64,34 @@ client.on('message', async msg => {
 				if (args.length > 0) {
 					switch (args[0]) {
 						case "help":
-							console.log("Help executed in " + msg.guild.name + " by " + msg.author.tag);
+							console.log(`Help executed in ${msg.guild.name} by ${msg.author.tag}`);
 							msg.channel.send({ embed: helpEmbed });
 							break;
 						case "examples":
-							console.log("Examples executed in " + msg.guild.name + " by " + msg.author.tag);
+							console.log(`Examples executed in ${msg.guild.name} by ${msg.author.tag}`);
 							msg.channel.send({ embed: examplesEmbed });
 							break;
 						case "end":
-							console.log("End executed in " + msg.guild.name + " by " + msg.author.tag);
+							console.log(`End executed in ${msg.guild.name} by ${msg.author.tag}`);
 							end(msg, args);
 							break;
 						case "invite":
-							console.log("Invite executed in " + msg.guild.name + " by " + msg.author.tag);
-							msg.reply("This is the link to invite me to another server! " + config.link);
+							console.log(`Invite executed in ${msg.guild.name} by ${msg.author.tag}`);
+							msg.reply(`This is the link to invite me to another server! ${config.link}`);
 							break;
 						default:
-							console.log("Poll executed in " + msg.guild.name + " by " + msg.author.tag);
+							console.log(`Poll executed in ${msg.guild.name} by ${msg.author.tag}`);
 							poll(msg, args);
 							break;
 					}
 				} else {
-					msg.reply(`Sorry, give me more at least a question`);
+					msg.reply("Sorry, give me more at least a question");
 				}
 			} else msg.reply(`Wrong command syntax. Learn how to do it correctly with \`${config.prefix} help\``);
 
 		} else {
 			msg.reply("You don't have permision to do that. Only administrators or users with a role named \"Poll Creator\"");
-			console.log(msg.author.tag + " on " + msg.guild.name + " tried to create a poll without permission");
+			console.log(`${msg.author.tag} on ${msg.guild.name} tried to create a poll without permission"`);
 		}
 	}
 });
