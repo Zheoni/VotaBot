@@ -1,5 +1,5 @@
-const Discord = require('discord.js');
-const hash = require('string-hash');
+const Discord = require("discord.js");
+const hash = require("string-hash");
 
 class Poll {
 	constructor(channel, question, answers, time, emojis) {
@@ -12,13 +12,13 @@ class Poll {
 		this.finished = false;
 		this.emojis = emojis;
 		this.embed = this.generateEmbed();
-		this.msg = undefined;
+		this.msg = null;
 		this.results = new Array();
 	}
 
 	async start() {
 		let message = await this.channel.send({ embed: this.embed })
-			.then(async message => {
+			.then(async (message) => {
 				await this.setMsg(message);
 				if (this.time > 0) {
 					this.results = this.voting(message).then(() => this.finish()).catch(console.error);
@@ -39,14 +39,14 @@ class Poll {
 		let str = new String();
 		let end = new Date(this.createdOn.getTime() + this.time);
 
-		if (this.answers[0] != "" && this.answers[1] != "") {
+		if (this.answers[0] !== "" && this.answers[1] !== "") {
 			for (let i = 0; i < this.answers.length && i < 10; i++) {
-				str += this.emojis[i] + ". " + this.answers[i] + "\n";
+				str += `${this.emojis[i]}. ${this.answers[i]}\n`;
 			}
 		}
 
-		let footer = "React with the emojis below | ID: " + this.id;
-		if (this.time > 0) footer += " | This poll ends in " + end.toUTCString();
+		let footer = `React with the emojis below | ID: ${this.id}`;
+		if (this.time > 0) footer += ` | This poll ends in ${end.toUTCString()}`;
 
 		let embed = new Discord.RichEmbed()
 			.setColor("#50C878")
@@ -67,7 +67,7 @@ class Poll {
 	voting() {
 		return new Promise(async (resolve, reject) => {
 			if (this.msg == null) return console.log("No hay mensaje para la votacion");
-			if (this.time < 1) return console.log("No hay tiempo para la votacion")
+			if (this.time < 1) return console.log("No hay tiempo para la votacion");
 			let filter = (reaction) => this.emojis.includes(reaction.emoji.name);
 			const reactions = await this.msg.awaitReactions(filter, { time: this.time });
 			let results = new Array(reactions.size);
@@ -87,9 +87,9 @@ class Poll {
 		return new Promise(async (resolve, reject) => {
 			this.finished = true;
 			this.finishedOn = now;
-			this.embed.setColor("FF0800");
-			this.embed.setAuthor(this.question + " [FINISHED]")
-			this.embed.setFooter(`Poll ${this.id} finished ${now.toUTCString()}`);
+			this.embed.setColor("FF0800")
+				.setAuthor(`${this.question} [FINISHED]`)
+				.setFooter(`Poll ${this.id} finished ${now.toUTCString()}`);
 			try {
 				await this.msg.edit({ embed: this.embed });
 			} catch (error) {
@@ -102,10 +102,10 @@ class Poll {
 	async getVotes() {
 		return new Promise((resolve, reject) => {
 			if (this.finished) {
-				if (this.time == 0) {
-					let reaction_collection = this.msg.reactions;
+				if (this.time === 0) {
+					let reactionCollection = this.msg.reactions;
 					for (let i = 0; i < this.answers.length; i++) {
-						this.results[i] = reaction_collection.get(this.emojis[i]).count - 1;
+						this.results[i] = reactionCollection.get(this.emojis[i]).count - 1;
 					}
 				}
 				resolve(this.results);
@@ -122,7 +122,7 @@ class Poll {
 				if (this.results.length >= 2) {
 					let description = new String();
 					let totalVotes = 0;
-					this.results.forEach(answer => totalVotes += answer);
+					this.results.forEach((answer) => totalVotes += answer);
 					if(totalVotes == 0) totalVotes = 1;
 					for (let i = 0; i < this.results.length; i++) {
 						description += this.emojis[i] + " " + this.answers[i] + " :: **" + this.results[i] + "** :: " +
@@ -134,7 +134,7 @@ class Poll {
 						.setAuthor("Results of: " + this.question)
 						.setDescription(description)
 						.setFooter(footer)
-						.setColor('#0080FF');
+						.setColor("#0080FF");
 
 
 					resolve(this.channel.send({ embed: resultsEmbed }));
