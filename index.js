@@ -66,7 +66,7 @@ async function poll(msg, args) {
 
 	p.start();
 
-	if(p.time <= 0) {
+	if (p.time <= 0) {
 		if (pollMap.size < MaxElements) {
 			while (pollMap.has(p.id)) {
 				try {
@@ -162,7 +162,8 @@ client.on("ready", () => {
 	console.log(`Bot logged in as ${client.user.tag}!`);
 	client.user.setActivity(`${config.prefix} help`);
 	setInterval(cleanMap, 86400000);	// 24h
-	setInterval(() => console.log("Stored polls: " + pollMap.size), 1800000);
+	setInterval(() => console.log(" Stored polls: " + pollMap.size
+		+ "\n VotaBot is in : " + client.guilds.size + " server(s)"), 1800000);
 });
 
 client.on("message", async (msg) => {
@@ -171,7 +172,7 @@ client.on("message", async (msg) => {
 		let roleid = -1;
 		try {
 			role = await msg.guild.roles.find((r) => r.name === "Poll Creator");
-			if(role) roleid = role.id;
+			if (role) roleid = role.id;
 		} catch (error) {
 			console.error(error);
 		}
