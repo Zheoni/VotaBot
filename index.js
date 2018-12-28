@@ -15,17 +15,17 @@ const helpEmbed = new Discord.RichEmbed()
 	.addField("Create Y/N poll", `\`${config.prefix} "{question}"\``)
 	.addField("Create complex poll [2-10 answers]", `\`${config.prefix} "{question}" "[Option 1]" "[Option 2]" ...\``)
 	.addField("Timed polls", `\`${config.prefix} time=TIME[s|m|h|d] ... \`, where "TIME" is the time to finish the
-		poll followed by it's unit.`)
+	poll followed by it's unit.`)
 	.addField("See results", `If a poll is not timed you need to finish it to see the results with \`${config.prefix}
-		end {ID (Only numbers)}\`, where ID is the poll id wich appears at the end of the poll`)
+	end {ID (Only numbers)}\`, where ID is the poll id wich appears at the end of the poll`)
 	.addField("See examples", `\`${config.prefix} examples\``)
 	.addBlankField()
 	.addField("Things to know", `Only administrators or people with a role named "Poll Creator" can interact with me.\n
 		If a NOT timed poll has more than a week, you cannot finish it to get the results.\n
 		If for some unlucky reason the bot restarts, in the current version you won't have the option of finishing any poll created before.\n
 		Use " not two '.`)
+	.addField("About", "The bot has been created by Zheoni. Find the source on <http://github.com/Zheoni/VotaBot>")
 	.setColor("#DDA0DD");
-//.addField("Invite", "Request a link to invite this bot to another server.");
 
 const examplesEmbed = new Discord.RichEmbed()
 	.setAuthor("Examples of VotaBot's commands")

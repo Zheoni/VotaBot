@@ -11,13 +11,12 @@ need any permisssion.
 ## Host the bot
 
 To host it create a file name "botconfig.json" in the bot's folder. Then write this into the file modifying the token
-and, if wanted, the prefix and the invite link (wich is currently not public, I cannot afford a hosting).
+and, if wanted, the prefix.
 
 ```json
 {
 	"token":"your token",
 	"prefix":"!poll",
-	"link": "not available yet"
 }
 ```
 
