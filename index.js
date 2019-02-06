@@ -7,8 +7,7 @@ const client = new Discord.Client();
 const numEmojis = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"];
 const handEmojis = ["👍", "👎"];
 
-// />poll\s(((-t=\d*([smhd]\s|\s))?("[^"]*"\s?)+)|(help)|(examples))/
-const commandSyntaxRegex = new RegExp(config.prefix + "\\s(((time=\\d+([smhd]\\s|\\s))?(\"[^\"]*\"\\s?)+)|(help)|(examples)|(end\\s\\d+))");
+const commandSyntaxRegex = new RegExp(`^${config.prefix}\\s(((time=\\d+([smhd]?\\s))?("[^"\\n]+"\\s?){1,11})|(help)|(examples)|(end\\s\\d+))$`);
 
 const helpEmbed = new Discord.RichEmbed()
 	.setAuthor("VotaBot's Commands")
@@ -24,7 +23,7 @@ const helpEmbed = new Discord.RichEmbed()
 		If a NOT timed poll has more than a week, you cannot finish it to get the results.\n
 		If for some unlucky reason the bot restarts, in the current version you won't have the option of finishing any poll created before.\n
 		Use " not two '.`)
-	.addField("About", "The bot has been created by Zheoni. Find the source on <http://github.com/Zheoni/VotaBot>")
+	.addField("About", "The bot has been created by Zheoni. Find the source code [here](http://github.com/Zheoni/VotaBot). Feel free to report bugs.")
 	.setColor("#DDA0DD");
 
 const examplesEmbed = new Discord.RichEmbed()
@@ -66,7 +65,7 @@ async function poll(msg, args) {
 
 	p.start();
 
-	if (p.time <= 0) {
+	if (p.time <= 0 && p.finished == false) {
 		if (pollMap.size < MaxElements) {
 			while (pollMap.has(p.id)) {
 				try {
@@ -114,7 +113,8 @@ function parseTime(msg, args) {
 		}
 	}
 
-	return time;
+	if (time > 604800000) return 604800000; // no more than a week.
+	else return time;
 }
 
 function parseToArgs(msg) {
@@ -152,6 +152,7 @@ function end(msg, args) {
 
 function cleanMap() {
 	let now = new Date();
+	console.log(" CLEANING DATABASE...");
 	pollMap.forEach((value, key, map) => {
 		if (value.createdOn.getTime() > now.getTime() + 604800000 || value.finished)	//one week or finished
 			map.delete(key);
