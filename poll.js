@@ -124,10 +124,25 @@ class Poll {
 					let totalVotes = 0;
 					this.results.forEach((answer) => totalVotes += answer);
 					if(totalVotes == 0) totalVotes = 1;
+
+					let finalResults = [];
+
 					for (let i = 0; i < this.results.length; i++) {
-						description += this.emojis[i] + " " + this.answers[i] + " :: **" + this.results[i] + "** :: " +
-							(this.results[i] / totalVotes) * 100 + "% \n";
+						let percentage = (this.results[i] / totalVotes * 100);
+						let result = {
+							emoji: this.emojis[i],
+							answer: this.answers[i],
+							votes: this.results[i],
+							percentage: percentage.toFixed(2)
+						}
+
+						finalResults.push(result);
 					}
+
+					finalResults.sort((a, b) => {return b.votes - a.votes});
+
+					finalResults.forEach((r) => {
+						description += `${r.emoji} ${r.answer} :: ** ${r.votes} ** :: ${r.percentage}% \n`;});
 
 					let footer = `Results from poll ${this.id} finished on ${this.finishedOn.toUTCString()}`;
 					let resultsEmbed = new Discord.RichEmbed()
