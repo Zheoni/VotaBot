@@ -4,11 +4,9 @@ const Poll = require("./poll.js");
 
 const client = new Discord.Client();
 
-const numEmojis = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"];
-const handEmojis = ["👍", "👎"];
+const commandSyntaxRegex = new RegExp(`^${config.prefix}\\s(((time=\\d+([smhd]?\\s))?("[^"\\n]+"\\s?){1,11})|(help)|(examples)|(end\\s\\d+)|(invite))$`);
 
-const commandSyntaxRegex = new RegExp(`^${config.prefix}\\s(((time=\\d+([smhd]?\\s))?("[^"\\n]+"\\s?){1,11})|(help)|(examples)|(end\\s\\d+))$`);
-
+// two pre-generated embeds
 const helpEmbed = new Discord.RichEmbed()
 	.setAuthor("VotaBot's Commands")
 	.addField("Create Y/N poll", `\`${config.prefix} "{question}"\``)
@@ -35,49 +33,72 @@ const examplesEmbed = new Discord.RichEmbed()
 	.setColor("#DDA0DD");
 
 
-let pollMap = new Map();
+let database = new Map();
 const MaxElements = 5000;
+
+async function finishTimedPolls() {
+	const now = new Date();
+	database.forEach((p, key, map) => {
+		if (p.isTimed && p.finishTime <= now) {
+			p.finish();
+			map.delete(key);
+		}
+	});
+}
 
 async function poll(msg, args) {
 
-	let time = await parseTime(msg, args);
+	const timeToVote = await parseTime(msg, args);
 
-	// console.log(args + " - Time: " + time);
-
-	let question = args.shift();
-	let answers = new Array();
-	let emojis = numEmojis;
+	const question = args.shift();
+	let answers = [];
+	let type;
 
 	switch (args.length) {
 		case 0:
 			answers = ["", ""];
-			emojis = handEmojis;
+			type = "yn";
 			break;
 		case 1:
 			msg.reply("You cannot create a poll with only one answer");
 			return;
 		default:
 			answers = args;
+			type = "default";
 			break;
 	}
 
-	let p = await new Poll(msg.channel, question, answers, time, emojis);
+	const p = await new Poll(msg.channel, question, answers, timeToVote, type);
 
 	p.start();
 
-	if (p.time <= 0 && p.finished == false) {
-		if (pollMap.size < MaxElements) {
-			while (pollMap.has(p.id)) {
+	if (p.hasFinished == false) {
+		if (database.size < MaxElements) {
+			while (database.has(p.id)) {
 				try {
-					p.regenerateId();
+					p.generateId();
 				} catch (error) {
 					console.error(error);
 				}
 			}
-			pollMap.set(p.id, p);
+			database.set(p.id, p);
 		}
 	}
-	// console.log(pollMap);
+}
+
+function end(msg, args) {
+	let id = Number(args[1]);
+	if (database.has(id)) {
+		let p = database.get(id);
+		if (!p.finished) {
+			p.finish();
+			database.delete(p.id);
+		} else {
+			msg.reply("That poll has already been finished.");
+		}
+	} else {
+		msg.reply("That id not in memory. The id is wrong or it's not in my memory for several reasons");
+	}
 }
 
 function parseTime(msg, args) {
@@ -87,18 +108,23 @@ function parseTime(msg, args) {
 	if (args[0].startsWith("time=")) {
 		const timeRegex = /\d+/;
 		const unitRegex = /s|m|h|d/i;
-		let _time = args.shift();
+		let timeString = args.shift();
 		let unit = "s";
 
-		let match1 = _time.match(timeRegex);
-		if (match1 != null) time = parseInt(match1.shift());
-		else {
+		let match;
+
+		// check if the time is correct
+		match = timeString.match(timeRegex);
+		if (match != null) {
+			time = parseInt(match.shift());
+		} else {
 			msg.reply("Wrong time syntax!");
 			return;
 		}
 
-		let match2 = _time.split("=").pop().match(unitRegex);
-		if (match2 != null) unit = match2.shift();
+		// check the units of the time
+		match = timeString.split("=").pop().match(unitRegex);
+		if (match != null) unit = match.shift();
 
 		switch (unit) {
 			case "s": time *= 1000;
@@ -109,7 +135,7 @@ function parseTime(msg, args) {
 				break;
 			case "d": time *= 86400000;
 				break;
-			default: time *= 1000;
+			default: time *= 60000;
 		}
 	}
 
@@ -132,28 +158,10 @@ function parseToArgs(msg) {
 	return args;
 }
 
-function end(msg, args) {
-	let id = Number(args[1]);
-	if (pollMap.has(id)) {
-		let p = pollMap.get(id);
-		if (!p.finished) {
-			if (p.time === 0) {
-				p.finish();
-			} else {
-				msg.reply("A timed poll cannot be ended before the time it was set.");
-			}
-		} else {
-			msg.reply("That poll has already ended");
-		}
-	} else {
-		msg.reply("That id not in memory. The id is wrong or it's not in my memory for several reasons");
-	}
-}
-
 function cleanMap() {
 	let now = new Date();
 	console.log(" CLEANING DATABASE...");
-	pollMap.forEach((value, key, map) => {
+	database.forEach((value, key, map) => {
 		if (value.createdOn.getTime() > now.getTime() + 604800000 || value.finished)	//one week or finished
 			map.delete(key);
 	});
@@ -162,8 +170,9 @@ function cleanMap() {
 client.on("ready", () => {
 	console.log(`Bot logged in as ${client.user.tag}!`);
 	client.user.setActivity(`${config.prefix} help`);
-	setInterval(cleanMap, 86400000);	// 24h
-	setInterval(() => console.log(" Stored polls: " + pollMap.size
+	setInterval(finishTimedPolls, 10000);
+	setInterval(cleanMap, 86400000); // 24h
+	setInterval(() => console.log(" Stored polls: " + database.size
 		+ "\n VotaBot is in : " + client.guilds.size + " server(s)"), 1800000);
 });
 
@@ -195,8 +204,10 @@ client.on("message", async (msg) => {
 							end(msg, args);
 							break;
 						case "invite":
-							console.log(`Invite executed in ${msg.guild.name} by ${msg.author.tag}`);
-							msg.reply(`This is the link to invite me to another server! ${config.link}`);
+							if (config.link) {
+								console.log(`Invite executed in ${msg.guild.name} by ${msg.author.tag}`);
+								msg.reply(`This is the link to invite me to another server! ${config.link}`);
+							}
 							break;
 						default:
 							console.log(`Poll executed in ${msg.guild.name} by ${msg.author.tag}`);
