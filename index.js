@@ -10,20 +10,23 @@ const commandSyntaxRegex = new RegExp(`^${config.prefix}\\s(((time=\\d+([smhd]?\
 // two pre-generated embeds
 const helpEmbed = new Discord.RichEmbed()
 	.setAuthor("VotaBot's Commands")
-	.addField("Create Y/N poll", `\`${config.prefix} "{question}"\``)
-	.addField("Create complex poll [2-10 answers]", `\`${config.prefix} "{question}" "[Option 1]" "[Option 2]" ...\``)
-	.addField("Timed polls", `\`${config.prefix} time=TIME[s|m|h|d] ... \`, where "TIME" is the time to finish the
-	poll followed by it's unit.`)
-	.addField("See results", `If a poll is not timed you need to finish it to see the results with \`${config.prefix}
-	end {ID (Only numbers)}\`, where ID is the poll id wich appears at the end of the poll`)
+	.addField("Create Y/N poll", `\`${config.prefix} "Question"\``)
+	.addField("Create complex poll [2-10 answers]", `\`${config.prefix} "Question" "Option 1" "Option 2" ["Option 3" ...]\` (quotes are necessary)`)
+	.addField("Timed polls that close automatically", `\`${config.prefix} time=X{s|m|h|d} ...\`, where "X" is the time to finish the
+		poll followed by it's unit.`)
+	.addField("See results of a poll and close the voting", `\`${config.prefix} end ID\`, where ID is the poll id wich
+		appears at the end of the poll`)
 	.addField("See examples", `\`${config.prefix} examples\``)
 	.addBlankField()
-	.addField("Things to know", `Only administrators or people with a role named "Poll Creator" can interact with me.\n
-		If a NOT timed poll has more than a week, you cannot finish it to get the results.\n
-		If for some unlucky reason the bot restarts, in the current version you won't have the option of finishing any poll created before.\n
-		Use " not two '.`)
 	.addField("About", "The bot has been created by Zheoni. Find the source code [here](http://github.com/Zheoni/VotaBot). Feel free to report bugs.")
 	.setColor("#DDA0DD");
+
+const helpMessage = `**Things to know**.
+-Only administrators or people with a role named "Poll Creator" can interact with me.
+-Polls are only stored for a week, you can't retrieve the results from an older poll (also applies to timed polls).
+-If for some unlucky reason the bot restarts, in the current version you won't have the option of finishing any poll created before.
+-Use " not two '.
+-There is a 10 seconds max error for timed polls.`;
 
 const examplesEmbed = new Discord.RichEmbed()
 	.setAuthor("Examples of VotaBot's commands")
@@ -177,51 +180,62 @@ client.on("ready", () => {
 
 client.on("message", async (msg) => {
 	if (msg.content.startsWith(config.prefix) && !msg.author.bot) {
-		let role;
-		let roleid = -1;
-		try {
-			role = await msg.guild.roles.find((r) => r.name === "Poll Creator");
-			if (role) roleid = role.id;
-		} catch (error) {
-			console.error(error);
-		}
-		if (msg.member.hasPermission("ADMINISTRATOR") || msg.member.roles.has(roleid)) {
-			if (msg.content.match(commandSyntaxRegex)) {
-				let args = parseToArgs(msg);
-				if (args.length > 0) {
-					switch (args[0]) {
-						case "help":
-							console.log(`Help executed in ${msg.guild.name} by ${msg.author.tag}`);
-							msg.channel.send({ embed: helpEmbed });
-							break;
-						case "examples":
-							console.log(`Examples executed in ${msg.guild.name} by ${msg.author.tag}`);
-							msg.channel.send({ embed: examplesEmbed });
-							break;
-						case "end":
-							console.log(`End executed in ${msg.guild.name} by ${msg.author.tag}`);
-							end(msg, args);
-							break;
-						case "invite":
-							if (config.link) {
-								console.log(`Invite executed in ${msg.guild.name} by ${msg.author.tag}`);
-								msg.reply(`This is the link to invite me to another server! ${config.link}`);
-							}
-							break;
-						default:
-							console.log(`Poll executed in ${msg.guild.name} by ${msg.author.tag}`);
-							poll(msg, args);
-							break;
-					}
-				} else {
-					msg.reply("Sorry, give me more at least a question");
-				}
-			} else msg.reply(`Wrong command syntax. Learn how to do it correctly with \`${config.prefix} help\``);
+		// if its a guild, check permissions
+		let isDM = false;
+		if (msg.channel.type === "text" || msg.channel.type === "news") {
+			console.log("uwu");
+			let role;
+			let roleid = -1;
+			try {
+				role = await msg.guild.roles.find((r) => r.name === "Poll Creator");
+				if (role) roleid = role.id;
+			} catch (error) {
+				console.error(error);
+			}
 
+			if (!(msg.member.hasPermission("ADMINISTRATOR") || msg.member.roles.has(roleid))) {
+				msg.reply("You don't have permision to do that. Only administrators or users with a role named \"Poll Creator\"");
+				console.log(`${msg.author.tag} on ${msg.guild.name} tried to create a poll without permission"`);
+				return;
+			}
 		} else {
-			msg.reply("You don't have permision to do that. Only administrators or users with a role named \"Poll Creator\"");
-			console.log(`${msg.author.tag} on ${msg.guild.name} tried to create a poll without permission"`);
+			isDM = true;
 		}
+
+		if (msg.content.match(commandSyntaxRegex)) {
+			let args = parseToArgs(msg);
+			if (args.length > 0) {
+				console.log(`${args[0]} executed in ${msg.guild ? msg.guild.name : (msg.author.username + "'s DMs")} by ${msg.author.tag}`);
+				switch (args[0]) {
+					case "help":
+						await msg.author.dmChannel.send({ embed: helpEmbed });
+						msg.author.dmChannel.send(helpMessage);
+						break;
+					case "examples":
+						msg.author.dmChannel.send({ embed: examplesEmbed });
+						break;
+					case "end":
+						if (!isDM) {
+							end(msg, args);
+						}
+						break;
+					case "invite":
+						if (config.link) {
+							msg.reply(`This is the link to invite me to another server! ${config.link}`);
+						} else {
+							msg.reply("The link is not available in this moment.");
+						}
+						break;
+					default:
+						if (!isDM) {
+							poll(msg, args);
+						}
+						break;
+				}
+			} else {
+				msg.reply("Sorry, give me more at least a question");
+			}
+		} else msg.reply(`Wrong command syntax. Learn how to do it correctly with \`${config.prefix} help\``);
 	}
 });
 
