@@ -92,15 +92,12 @@ async function end(msg, args) {
 		if (err) { console.errror(err); }
 		if (dbp) {
 			const p = Poll.copyConstructor(dbp);
-			if (!p.hasFinished) {
-				if (p.finish(client)) {
-					database.remove({ id: p.id });
-				}
-			} else {
-				msg.reply("That poll has already been finished.");
+			if (!p.hasFinished && p.guildId === msg.guild.id) {
+				p.finish(client)
+				database.remove({ id: p.id });
 			}
 		} else {
-			msg.reply("That id not in memory. The id is wrong or it's not in my memory for several reasons");
+			msg.reply("Cannot find the poll.");
 		}
 	});
 }
@@ -163,8 +160,9 @@ function parseToArgs(msg) {
 }
 
 function cleanDatabase() {
+	console.log("Cleaning the database...");
 	const aWeekAgo = Date.now() - 604800000;
-	database.remove({ createdOn: { $lt: aWeekAgo } }, { multi: true });
+	database.remove({ createdOn: { $lt: aWeekAgo } }, { multi: true }, (err, n) => console.log(n + " entries removed."));
 }
 
 client.on("ready", () => {
@@ -174,8 +172,7 @@ client.on("ready", () => {
 	setInterval(finishTimedPolls, 10000); // 10s
 	setInterval(cleanDatabase, 86400000); // 24h
 
-	setInterval(() => console.log(" Stored polls: " + database.size
-		+ "\n VotaBot is in : " + client.guilds.size + " server(s)"), 1800000); // logging info
+	setInterval(() => console.log("The bot is in " + client.guilds.size + " guild(s)"), 1800000); // logging info
 });
 
 client.on("message", async (msg) => {

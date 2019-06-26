@@ -63,10 +63,6 @@ class Poll {
 			console.error("Cant find poll message");
 			return;
 		}
-		if (message.guild.id != this.guildId) {
-			console.error("Tried to finish a poll from other guild.");
-			return;
-		}
 		if (message.embeds.length < 1) {
 			console.error("The poll message ha no embeds.");
 			return;
