@@ -5,34 +5,109 @@ const numEmojis = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣
 const handEmojis = ["👍", "👎"];
 
 class Poll {
-	constructor(channel, question, answers, time, type) {
-		this.channel = channel;
-		this.msg = null;
-		this.question = question;
-		this.answers = answers;
-		this.createdOn = new Date();
-		this.finishedOn = null;
-		this.isTimed = (time != 0);
-		this.finishTime = new Date(this.createdOn.getTime() + time);
-		this.hasFinished = false;
-		this.type = type;
-		this.emojis = this.getEmojis(type);
-		this.results = [];
-		this.id = this.generateId();
-		this.embed = this.generateEmbed();
+	constructor(msg, question, answers, time, type) {
+		if (msg) { // if the constructor have parameters
+			this.guildId = msg.guild.id;
+			this.channelId = msg.channel.id;
+			this.msgId = null;
+			this.question = question;
+			this.answers = answers;
+			this.createdOn = Date.now();
+			this.isTimed = (time != 0);
+			this.hasFinished = false;
+			this.finishTime = new Date(this.createdOn + time).getTime();
+			this.type = type;
+			this.emojis = this.getEmojis(type);
+			this.results = [];
+			this.id = this.generateId();
+		}
 	}
 
-	async start() {
-		let message = await this.channel.send({ embed: this.embed })
-		this.msg = message;
-		for (let i = 0; i < this.answers.length && i < 10; i++) {
+	static copyConstructor (other) {
+		let p = new Poll();
+
+		p.guildId = other.guildId;
+		p.channelId = other.channelId;
+		p.msgId = other.msgId;
+		p.question = other.question;
+		p.answers = other.answers;
+		p.createdOn = other.createdOn;
+		p.isTimed = other.isTimed;
+		p.finishTime = other.finishTime;
+		p.hasFinished = other.hasFInished;
+		p.type = other.type;
+		p.emojis = other.emojis;
+		p.results = other.results;
+		p.id = other.id;
+
+		return p;
+	}
+
+	async start(msg) {
+		const message = await msg.channel.send({ embed: this.generateEmbed() })
+		this.msgId = message.id;
+		for (let i = 0; i < this.answers.length && i < 10; ++i) {
 			try {
 				await message.react(this.emojis[i]);
 			} catch (error) {
 				console.log(error);
 			}
 		}
-		return message;
+		return message.id;
+	}
+
+	async finish(client) {
+		const now = new Date();
+		const message = await this.getPollMessage(client);
+		if (!message) {
+			console.error("Cant find poll message");
+			return;
+		}
+		if (message.guild.id != this.guildId) {
+			console.error("Tried to finish a poll from other guild.");
+			return;
+		}
+		if (message.embeds.length < 1) {
+			console.error("The poll message ha no embeds.");
+			return;
+		}
+		
+		this.hasFinished = true;
+		
+		const embed = new Discord.RichEmbed(message.embeds[0]);
+		embed.setColor("FF0800")
+			.setAuthor(`${this.question} [FINISHED]`)
+			.setFooter(`Poll ${this.id} finished ${now.toUTCString()}`);
+
+		try {
+			await message.edit({ embed: embed });
+			await this.getVotes(message);
+			await this.showResults(message.channel);
+		} catch (error) {
+			console.error(error);
+		}
+	}
+
+	async getVotes(message) {
+		if (this.hasFinished) {
+			const reactionCollection = message.reactions;
+			for (let i = 0; i < this.answers.length; i++) {
+				this.results[i] = reactionCollection.get(this.emojis[i]).count - 1;
+			}
+		} else {
+			throw new Error("Poll not ended");
+		}
+	}
+
+	async showResults(channel) {
+		if (!this.hasFinished) {
+			throw new Error("The poll is not finished");
+		}
+		if (this.results.length < 2) {
+			throw new Error("There are no results");
+		}
+
+		return await channel.send({ embed: this.generateResultsEmbed() });
 	}
 
 	generateEmbed() {
@@ -45,7 +120,7 @@ class Poll {
 		}
 
 		let footer = `React with the emojis below | ID: ${this.id}`;
-		if (this.isTimed) footer += ` | This poll ends in ${this.finishTime.toUTCString()}`;
+		if (this.isTimed) footer += ` | This poll ends in ${new Date(this.finishTime).toUTCString()}`;
 
 		let embed = new Discord.RichEmbed()
 			.setColor("#50C878")
@@ -54,33 +129,6 @@ class Poll {
 			.setFooter(footer);
 
 		return embed;
-	}
-
-	async finish() {
-		const now = new Date();
-		this.hasFinished = true;
-		this.finishedOn = now;
-		this.embed.setColor("FF0800")
-			.setAuthor(`${this.question} [FINISHED]`)
-			.setFooter(`Poll ${this.id} finished ${now.toUTCString()}`);
-		try {
-			await this.msg.edit({ embed: this.embed });
-			await this.getVotes();
-			await this.showResults();
-		} catch (error) {
-			console.error(error);
-		}
-	}
-
-	async getVotes() {
-		if (this.hasFinished) {
-			const reactionCollection = this.msg.reactions;
-			for (let i = 0; i < this.answers.length; i++) {
-				this.results[i] = reactionCollection.get(this.emojis[i]).count - 1;
-			}
-		} else {
-			throw new Error("Poll not ended");
-		}
 	}
 
 	generateResultsEmbed() {
@@ -104,13 +152,15 @@ class Poll {
 			finalResults.push(result);
 		}
 
-		finalResults.sort((a, b) => { return b.votes - a.votes });
+		if (this.type !== "yn") { // only sort if its not a yn poll
+			finalResults.sort((a, b) => { return b.votes - a.votes });
+		}
 
 		finalResults.forEach((r) => {
 			description += `${r.emoji} ${r.answer} :: ** ${r.votes} ** :: ${r.percentage}% \n`;
 		});
 
-		let footer = `Results from poll ${this.id} finished on ${this.finishedOn.toUTCString()}`;
+		let footer = `Results from poll ${this.id} finished on ${new Date(this.finishTime).toUTCString()}`;
 		let resultsEmbed = new Discord.RichEmbed()
 			.setAuthor("Results of: " + this.question)
 			.setDescription(description)
@@ -120,28 +170,17 @@ class Poll {
 		return resultsEmbed;
 	}
 
-	async showResults() {
-		if (!this.hasFinished) {
-			throw new Error("The poll is not finished");
-		}
-		if (this.results.length < 2) {
-			throw new Error("There are no results");
-		}
-
-		return await this.channel.send({ embed: this.generateResultsEmbed() });
-	}
-
 	generateId() {
 		let id = new String("");
 		if (this.id) {
-			let now = Date();
-			id += this.id + now.getUTCMilliseconds();
+			id += this.id + Date.now();
 		} else {
-			id += this.createdOn.getUTCFullYear();
-			id += this.createdOn.getUTCDate();
-			id += this.createdOn.getUTCHours();
-			id += this.createdOn.getUTCMinutes();
-			id += this.createdOn.getUTCMilliseconds();
+			const d = new Date(this.createdOn);
+			id += d.getUTCFullYear();
+			id += d.getUTCDate();
+			id += d.getUTCHours();
+			id += d.getUTCMinutes();
+			id += d.getUTCMilliseconds();
 			id += this.question;
 		}
 		this.id = hash(id);
@@ -156,6 +195,14 @@ class Poll {
 				return numEmojis;
 			default:
 				throw new Error("The poll type is not known");
+		}
+	}
+
+	async getPollMessage(client) {
+		try {
+			return await client.guilds.get(this.guildId).channels.get(this.channelId).fetchMessage(this.msgId);
+		} catch (err) {
+			return;
 		}
 	}
 }
