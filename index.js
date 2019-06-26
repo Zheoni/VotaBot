@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const config = require("./botconfig.json");
 const Poll = require("./poll.js");
+const Datastore = require('nedb');
 
 const client = new Discord.Client();
 
@@ -33,21 +34,27 @@ const examplesEmbed = new Discord.RichEmbed()
 	.setColor("#DDA0DD");
 
 
-let database = new Map();
-const MaxElements = 5000;
+let database = new Datastore('database.db');
+database.loadDatabase();
+database.persistence.setAutocompactionInterval(3600000);
 
 async function finishTimedPolls() {
-	const now = new Date();
-	database.forEach((p, key, map) => {
-		if (p.isTimed && p.finishTime <= now) {
-			p.finish();
-			map.delete(key);
-		}
+	const now = Date.now()
+	database.find({ isTimed: true, finishTime: { $lte: now } }, (err, dbps) => {
+		if (err) console.error(err);
+
+		dbps.forEach((dbp) => {
+			const p = Poll.copyConstructor(dbp);
+
+			if (p instanceof Poll && p.isTimed && p.finishTime <= now) {
+				p.finish(client);
+				database.remove({ id: p.id });
+			}
+		});
 	});
 }
 
 async function poll(msg, args) {
-
 	const timeToVote = await parseTime(msg, args);
 
 	const question = args.shift();
@@ -68,37 +75,31 @@ async function poll(msg, args) {
 			break;
 	}
 
-	const p = await new Poll(msg.channel, question, answers, timeToVote, type);
+	const p = await new Poll(msg, question, answers, timeToVote, type);
 
-	p.start();
+	await p.start(msg);
 
 	if (p.hasFinished == false) {
-		if (database.size < MaxElements) {
-			while (database.has(p.id)) {
-				try {
-					p.generateId();
-				} catch (error) {
-					console.error(error);
-				}
-			}
-			database.set(p.id, p);
-		}
+		database.insert(p);
+		// maybe we can get a duplicated id...
 	}
 }
 
-function end(msg, args) {
-	let id = Number(args[1]);
-	if (database.has(id)) {
-		let p = database.get(id);
-		if (!p.finished) {
-			p.finish();
-			database.delete(p.id);
+async function end(msg, args) {
+	const inputid = Number(args[1]);
+
+	database.findOne({ id: inputid }, (err, dbp) => {
+		if (err) { console.errror(err); }
+		if (dbp) {
+			const p = Poll.copyConstructor(dbp);
+			if (!p.hasFinished && p.guildId === msg.guild.id) {
+				p.finish(client)
+				database.remove({ id: p.id });
+			}
 		} else {
-			msg.reply("That poll has already been finished.");
+			msg.reply("Cannot find the poll.");
 		}
-	} else {
-		msg.reply("That id not in memory. The id is wrong or it's not in my memory for several reasons");
-	}
+	});
 }
 
 function parseTime(msg, args) {
@@ -158,22 +159,20 @@ function parseToArgs(msg) {
 	return args;
 }
 
-function cleanMap() {
-	let now = new Date();
-	console.log(" CLEANING DATABASE...");
-	database.forEach((value, key, map) => {
-		if (value.createdOn.getTime() > now.getTime() + 604800000 || value.finished)	//one week or finished
-			map.delete(key);
-	});
+function cleanDatabase() {
+	console.log("Cleaning the database...");
+	const aWeekAgo = Date.now() - 604800000;
+	database.remove({ createdOn: { $lt: aWeekAgo } }, { multi: true }, (err, n) => console.log(n + " entries removed."));
 }
 
 client.on("ready", () => {
 	console.log(`Bot logged in as ${client.user.tag}!`);
 	client.user.setActivity(`${config.prefix} help`);
-	setInterval(finishTimedPolls, 10000);
-	setInterval(cleanMap, 86400000); // 24h
-	setInterval(() => console.log(" Stored polls: " + database.size
-		+ "\n VotaBot is in : " + client.guilds.size + " server(s)"), 1800000);
+
+	setInterval(finishTimedPolls, 10000); // 10s
+	setInterval(cleanDatabase, 86400000); // 24h
+
+	setInterval(() => console.log("The bot is in " + client.guilds.size + " guild(s)"), 1800000); // logging info
 });
 
 client.on("message", async (msg) => {
