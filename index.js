@@ -181,9 +181,8 @@ client.on("ready", () => {
 client.on("message", async (msg) => {
 	if (msg.content.startsWith(config.prefix) && !msg.author.bot) {
 		// if its a guild, check permissions
-		let isDM = false;
+		let isDM = false, dmChannel;
 		if (msg.channel.type === "text" || msg.channel.type === "news") {
-			console.log("uwu");
 			let role;
 			let roleid = -1;
 			try {
@@ -208,11 +207,13 @@ client.on("message", async (msg) => {
 				console.log(`${args[0]} executed in ${msg.guild ? msg.guild.name : (msg.author.username + "'s DMs")} by ${msg.author.tag}`);
 				switch (args[0]) {
 					case "help":
-						await msg.author.dmChannel.send({ embed: helpEmbed });
-						msg.author.dmChannel.send(helpMessage);
+						dmChannel = await msg.author.createDM();
+						await dmChannel.send({ embed: helpEmbed });
+						dmChannel.send(helpMessage);
 						break;
 					case "examples":
-						msg.author.dmChannel.send({ embed: examplesEmbed });
+						dmChannel = await msg.author.createDM();
+						dmChannel.send({ embed: examplesEmbed });
 						break;
 					case "end":
 						if (!isDM) {
