@@ -2,8 +2,18 @@ const Discord = require("discord.js");
 const config = require("./botconfig.json");
 const Poll = require("./poll.js");
 const Datastore = require('nedb');
+const DBL = require("dblapi.js");
 
 const client = new Discord.Client();
+
+
+const dbl = function() {
+	if (config.topggtoken) {
+		return new DBL(config.topggtoken, client);
+	} else {
+		return null;
+	}
+}();
 
 const commandSyntaxRegex = new RegExp(`^${config.prefix}\\s(((time=\\d+([smhd]?\\s))?("[^"\\n]+"\\s?){1,11})|(help)|(examples)|(end\\s\\d+)|(invite))$`);
 
