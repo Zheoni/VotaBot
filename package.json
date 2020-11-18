@@ -10,7 +10,7 @@
   "author": "Zheoni",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^11.4.2",
+    "discord.js": "^11.6.4",
     "nedb": "^1.8.0",
     "string-hash": "^1.1.3"
   }
